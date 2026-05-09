@@ -10,6 +10,8 @@ import {
 } from "@/lib/constants";
 import {
   AnalysisResult,
+  ConfidenceLevel,
+  EvidenceSnippet,
   JobInput,
   OutreachMessages,
   RecommendedAction,
@@ -45,14 +47,40 @@ function containsTerm(text: string, term: string) {
   return buildTermRegExp(term).test(text);
 }
 
+function getEvidenceSnippet(sourceText: string, phrase: string) {
+  const compactSource = sourceText.replace(/\s+/g, " ").trim();
+  const phraseIndex = compactSource.toLowerCase().indexOf(normalizeText(phrase));
+
+  if (phraseIndex === -1) {
+    return "";
+  }
+
+  const start = Math.max(0, phraseIndex - 90);
+  const end = Math.min(compactSource.length, phraseIndex + phrase.length + 90);
+  const prefix = start > 0 ? "..." : "";
+  const suffix = end < compactSource.length ? "..." : "";
+
+  return `${prefix}${compactSource.slice(start, end).trim()}${suffix}`;
+}
+
 function uniqueSorted(values: string[]) {
   return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
 }
 
-function phraseMatches(text: string, phrases: readonly string[], category: WorkAuthSignal["category"]) {
+function phraseMatches(
+  sourceText: string,
+  phrases: readonly string[],
+  category: WorkAuthSignal["category"]
+) {
+  const text = normalizeText(sourceText);
+
   return phrases
     .filter((phrase) => containsTerm(text, phrase))
-    .map<WorkAuthSignal>((phrase) => ({ phrase, category }));
+    .map<WorkAuthSignal>((phrase) => ({
+      phrase,
+      category,
+      snippet: getEvidenceSnippet(sourceText, phrase)
+    }));
 }
 
 function isNegatedPositiveSignal(text: string, phrase: string) {
@@ -108,11 +136,11 @@ function clamp(value: number, min: number, max: number) {
 
 export function extractSignals(jobDescription: string): SignalBuckets {
   const text = normalizeText(jobDescription);
-  const critical = phraseMatches(text, WORK_AUTH_PHRASES.critical, "critical");
-  const high = phraseMatches(text, WORK_AUTH_PHRASES.high, "high");
-  const medium = phraseMatches(text, WORK_AUTH_PHRASES.medium, "medium");
+  const critical = phraseMatches(jobDescription, WORK_AUTH_PHRASES.critical, "critical");
+  const high = phraseMatches(jobDescription, WORK_AUTH_PHRASES.high, "high");
+  const medium = phraseMatches(jobDescription, WORK_AUTH_PHRASES.medium, "medium");
   const negativePhrases = [...critical, ...high].map((signal) => signal.phrase);
-  const positive = phraseMatches(text, WORK_AUTH_PHRASES.positive, "positive").filter(
+  const positive = phraseMatches(jobDescription, WORK_AUTH_PHRASES.positive, "positive").filter(
     (signal) =>
       !negativePhrases.some((negativePhrase) => containsTerm(negativePhrase, signal.phrase)) &&
       !isNegatedPositiveSignal(text, signal.phrase)
@@ -208,7 +236,7 @@ export function calculateSkillMatch(jobDescription: string, roleType: RoleType, 
   );
 
   const expectedKeywordCount = Math.min(8, relevantKeywords.length);
-  const baseScore = Math.round((matchedKeywords.length / expectedKeywordCount) * 30);
+  const baseScore = Math.round((Math.min(matchedKeywords.length, expectedKeywordCount) / expectedKeywordCount) * 30);
   const backgroundBoost = clamp(backgroundAlignedKeywords.length * 2, 0, 5);
   const skillMatchScore = clamp(baseScore + backgroundBoost, 0, 35);
 
@@ -484,6 +512,144 @@ Thank you,
   };
 }
 
+function collectEvidenceSnippets(params: {
+  jobDescription: string;
+  signals: SignalBuckets;
+  matchedKeywords: string[];
+  seniorityRisk: "Low" | "Medium" | "High";
+  locationRisk: "Low" | "Medium" | "High";
+  roleSummary: string;
+}): EvidenceSnippet[] {
+  const workAuthEvidence = [
+    ...params.signals.critical,
+    ...params.signals.high,
+    ...params.signals.medium,
+    ...params.signals.positive
+  ]
+    .filter((signal) => signal.snippet)
+    .map<EvidenceSnippet>((signal) => ({
+      label: "Work authorization signal",
+      phrase: signal.phrase,
+      snippet: signal.snippet ?? "",
+      category: signal.category
+    }));
+
+  const skillEvidence = params.matchedKeywords
+    .slice(0, 5)
+    .map((keyword) => ({
+      keyword,
+      snippet: getEvidenceSnippet(params.jobDescription, keyword)
+    }))
+    .filter((item) => item.snippet)
+    .map<EvidenceSnippet>((item) => ({
+      label: "Matched skill keyword",
+      phrase: item.keyword,
+      snippet: item.snippet,
+      category: "skill"
+    }));
+
+  const seniorityEvidence: EvidenceSnippet[] =
+    params.seniorityRisk === "Medium"
+      ? []
+      : [
+          {
+            label: "Seniority assessment",
+            phrase: `${params.seniorityRisk} seniority risk`,
+            snippet:
+              params.seniorityRisk === "Low"
+                ? "The posting includes entry-level or early-career language."
+                : "The posting includes senior-level requirements or leadership expectations.",
+            category: "seniority"
+          }
+        ];
+
+  const locationEvidence: EvidenceSnippet[] =
+    params.locationRisk === "Medium"
+      ? []
+      : [
+          {
+            label: "Location assessment",
+            phrase: `${params.locationRisk} location risk`,
+            snippet:
+              params.locationRisk === "Low"
+                ? "The role appears remote-friendly or flexible."
+                : "The role includes onsite, relocation, clearance, or similar location friction.",
+            category: "location"
+          }
+        ];
+
+  return [...workAuthEvidence, ...skillEvidence, ...seniorityEvidence, ...locationEvidence].slice(
+    0,
+    12
+  );
+}
+
+function calculateAnalysisConfidence(params: {
+  input: JobInput;
+  signals: SignalBuckets;
+  matchedKeywords: string[];
+  evidenceSnippets: EvidenceSnippet[];
+}): { level: ConfidenceLevel; reasons: string[] } {
+  const descriptionLength = params.input.jobDescription.trim().length;
+  const explicitSignalCount =
+    params.signals.critical.length +
+    params.signals.high.length +
+    params.signals.medium.length +
+    params.signals.positive.length;
+  const reasons: string[] = [];
+  let confidenceScore = 0;
+
+  if (descriptionLength >= 900) {
+    confidenceScore += 2;
+    reasons.push("The job description is detailed enough for a stronger scan.");
+  } else if (descriptionLength >= 350) {
+    confidenceScore += 1;
+    reasons.push("The job description has enough detail for a useful first pass.");
+  } else {
+    reasons.push("The job description is short, so some requirements may be missing.");
+  }
+
+  if (explicitSignalCount > 0) {
+    confidenceScore += 2;
+    reasons.push("The posting includes explicit work authorization or location language.");
+  } else {
+    reasons.push("No explicit work authorization language was found.");
+  }
+
+  if (params.matchedKeywords.length >= 4) {
+    confidenceScore += 1;
+    reasons.push("Several role keywords were matched against the selected track.");
+  }
+
+  if (params.input.jobTitle.trim()) {
+    confidenceScore += 1;
+    reasons.push("The job title helps validate seniority and role alignment.");
+  }
+
+  if (params.input.location.trim()) {
+    confidenceScore += 1;
+    reasons.push("Location context is available for onsite, hybrid, or remote friction.");
+  }
+
+  if (params.input.background?.trim()) {
+    confidenceScore += 1;
+    reasons.push("Your background text improves resume-fit interpretation.");
+  }
+
+  if (params.evidenceSnippets.length >= 3) {
+    confidenceScore += 1;
+    reasons.push("Multiple evidence snippets support the recommendation.");
+  }
+
+  const level: ConfidenceLevel =
+    confidenceScore >= 7 ? "High" : confidenceScore >= 4 ? "Medium" : "Low";
+
+  return {
+    level,
+    reasons: reasons.slice(0, 5)
+  };
+}
+
 export function analyzeJobDescription(input: JobInput): AnalysisResult {
   const workAuth = calculateWorkAuthorizationRisk(
     input.jobDescription,
@@ -522,12 +688,28 @@ export function analyzeJobDescription(input: JobInput): AnalysisResult {
     matchedKeywords: skillMatch.matchedKeywords,
     workAuthorizationRisk: workAuth.risk
   };
+  const evidenceSnippets = collectEvidenceSnippets({
+    jobDescription: input.jobDescription,
+    signals: workAuth.signals,
+    matchedKeywords: skillMatch.matchedKeywords,
+    seniorityRisk: seniority.risk,
+    locationRisk: location.risk,
+    roleSummary: roleMatch.summary
+  });
+  const confidence = calculateAnalysisConfidence({
+    input,
+    signals: workAuth.signals,
+    matchedKeywords: skillMatch.matchedKeywords,
+    evidenceSnippets
+  });
 
   return {
     recommendedAction: recommendation.action,
     explanation: recommendation.explanation,
     overallScore,
     fitScore: overallScore,
+    analysisConfidence: confidence.level,
+    confidenceReasons: confidence.reasons,
     workAuthorizationRisk: workAuth.risk,
     skillMatchScore: skillMatch.skillMatchScore,
     seniorityRisk: seniority.risk,
@@ -545,6 +727,7 @@ export function analyzeJobDescription(input: JobInput): AnalysisResult {
       overall: overallScore
     },
     signals: workAuth.signals,
+    evidenceSnippets,
     matchedKeywords: skillMatch.matchedKeywords,
     missingKeywords: skillMatch.missingKeywords,
     backgroundAlignedKeywords: skillMatch.backgroundAlignedKeywords,

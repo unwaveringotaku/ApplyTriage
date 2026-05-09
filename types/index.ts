@@ -19,11 +19,23 @@ export type RoleType =
 
 export type RiskLevel = "Low" | "Medium" | "High" | "Critical";
 
+export type ConfidenceLevel = "Low" | "Medium" | "High";
+
 export type RecommendedAction =
   | "APPLY NOW"
   | "MESSAGE RECRUITER FIRST"
   | "APPLY WITH REFERRAL"
   | "SKIP";
+
+export type ApplicationStage =
+  | "Saved"
+  | "Outreach needed"
+  | "Messaged"
+  | "Applied"
+  | "Interviewing"
+  | "Offer"
+  | "Rejected"
+  | "Archived";
 
 export type SignalCategory = "critical" | "high" | "medium" | "positive";
 
@@ -49,6 +61,7 @@ export interface ScoreBreakdown {
 export interface WorkAuthSignal {
   phrase: string;
   category: SignalCategory;
+  snippet?: string;
 }
 
 export interface SignalBuckets {
@@ -66,11 +79,20 @@ export interface OutreachMessages {
   followUpMessage: string;
 }
 
+export interface EvidenceSnippet {
+  label: string;
+  phrase: string;
+  snippet: string;
+  category: SignalCategory | "skill" | "seniority" | "location" | "role";
+}
+
 export interface AnalysisResult {
   recommendedAction: RecommendedAction;
   explanation: string;
   overallScore: number;
   fitScore: number;
+  analysisConfidence: ConfidenceLevel;
+  confidenceReasons: string[];
   workAuthorizationRisk: RiskLevel;
   skillMatchScore: number;
   seniorityRisk: Exclude<RiskLevel, "Critical">;
@@ -81,6 +103,7 @@ export interface AnalysisResult {
   workAuthorizationCompatibilityScore: number;
   scoreBreakdown: ScoreBreakdown;
   signals: SignalBuckets;
+  evidenceSnippets: EvidenceSnippet[];
   matchedKeywords: string[];
   missingKeywords: string[];
   backgroundAlignedKeywords: string[];
@@ -101,18 +124,27 @@ export interface SavedJob {
   location: string;
   selectedStatus: WorkAuthorizationStatus;
   recommendedAction: RecommendedAction;
+  applicationStage: ApplicationStage;
   overallScore: number;
   workAuthorizationRisk: RiskLevel;
   skillMatch: number;
+  analysisConfidence: ConfidenceLevel;
+  confidenceReasons: string[];
   matchedKeywords: string[];
   missingKeywords: string[];
+  evidenceSnippets: EvidenceSnippet[];
   recruiterMessage: string;
   originalJobDescription: string;
   roleType: RoleType;
   background?: string;
+  sourceUrl?: string;
+  notes?: string;
+  nextStep?: string;
+  followUpDate?: string;
   explanation: string;
   scoreBreakdown: ScoreBreakdown;
   signals: SignalBuckets;
   seniorityRisk: Exclude<RiskLevel, "Critical">;
   locationRisk: Exclude<RiskLevel, "Critical">;
+  updatedAt: string;
 }

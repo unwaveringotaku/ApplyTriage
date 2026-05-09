@@ -6,7 +6,9 @@
     "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node tests/run-tests.cjs",
+    "verify": "npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
     "next": "15.5.15",

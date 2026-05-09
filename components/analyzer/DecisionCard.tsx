@@ -180,10 +180,35 @@ export function DecisionCard({ result, onSave, isSaved }: DecisionCardProps) {
           >
             Location risk: {result.locationRisk}
           </div>
+          <div
+            className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ring-1 ${getRiskStyles(
+              result.analysisConfidence
+            )}`}
+          >
+            Analysis confidence: {result.analysisConfidence}
+          </div>
           <div className="inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">
             Decision first. Evidence below.
           </div>
         </div>
+
+        {result.confidenceReasons.length ? (
+          <div className="mt-4 rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              Confidence notes
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {result.confidenceReasons.map((reason) => (
+                <span
+                  key={reason}
+                  className="rounded-full border border-white/10 bg-white/6 px-3 py-2 text-xs font-medium text-slate-200"
+                >
+                  {reason}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
           <CopyButton

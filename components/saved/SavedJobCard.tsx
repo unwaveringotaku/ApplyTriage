@@ -3,12 +3,14 @@
 import { useState } from "react";
 
 import { CopyButton } from "@/components/CopyButton";
+import { APPLICATION_STAGE_OPTIONS } from "@/lib/constants";
 import { formatDate, getActionStyles, getRiskStyles } from "@/lib/presentation";
-import { RecommendedAction, SavedJob } from "@/types";
+import { ApplicationStage, RecommendedAction, SavedJob } from "@/types";
 
 interface SavedJobCardProps {
   job: SavedJob;
   onDelete: (id: string) => void;
+  onUpdate: (id: string, patch: Partial<SavedJob>) => void;
 }
 
 const ACTION_ACCENTS: Record<RecommendedAction, string> = {
@@ -18,7 +20,7 @@ const ACTION_ACCENTS: Record<RecommendedAction, string> = {
   SKIP: "from-rose-200/70 via-orange-100/35 to-transparent"
 };
 
-export function SavedJobCard({ job, onDelete }: SavedJobCardProps) {
+export function SavedJobCard({ job, onDelete, onUpdate }: SavedJobCardProps) {
   const [expanded, setExpanded] = useState(false);
   const previewKeywords = job.matchedKeywords.slice(0, 4);
   const previewGaps = job.missingKeywords.slice(0, 3);
@@ -37,6 +39,9 @@ export function SavedJobCard({ job, onDelete }: SavedJobCardProps) {
               </span>
               <span className="inline-flex rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 {job.roleType}
+              </span>
+              <span className="inline-flex rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                {job.applicationStage}
               </span>
             </div>
             <p className="mt-4 text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -68,10 +73,17 @@ export function SavedJobCard({ job, onDelete }: SavedJobCardProps) {
             >
               {job.workAuthorizationRisk} auth risk
             </span>
+            <span
+              className={`inline-flex rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] ring-1 ${getRiskStyles(
+                job.analysisConfidence
+              )}`}
+            >
+              {job.analysisConfidence} confidence
+            </span>
           </div>
         </div>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <div className="metric-tile rounded-[1.55rem] p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Score</p>
             <p className="mt-3 text-3xl font-semibold text-slate-950">{job.overallScore}</p>
@@ -87,6 +99,10 @@ export function SavedJobCard({ job, onDelete }: SavedJobCardProps) {
           <div className="metric-tile rounded-[1.55rem] p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Role track</p>
             <p className="mt-3 text-sm leading-7 text-slate-700">{job.roleType}</p>
+          </div>
+          <div className="metric-tile rounded-[1.55rem] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Next stage</p>
+            <p className="mt-3 text-sm leading-7 text-slate-700">{job.applicationStage}</p>
           </div>
         </div>
 
@@ -132,7 +148,7 @@ export function SavedJobCard({ job, onDelete }: SavedJobCardProps) {
           </div>
         ) : null}
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <div className="mt-6 grid gap-3 sm:grid-cols-4">
           <button
             type="button"
             onClick={() => setExpanded((current) => !current)}
@@ -141,6 +157,24 @@ export function SavedJobCard({ job, onDelete }: SavedJobCardProps) {
           >
             {expanded ? "Hide details" : "View details"}
           </button>
+          <label className="sr-only" htmlFor={`stage-${job.id}`}>
+            Application stage
+          </label>
+          <select
+            id={`stage-${job.id}`}
+            value={job.applicationStage}
+            onChange={(event) =>
+              onUpdate(job.id, { applicationStage: event.target.value as ApplicationStage })
+            }
+            className="h-11 w-full rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition hover:border-slate-300 hover:bg-slate-50 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+            aria-label="Application stage"
+          >
+            {APPLICATION_STAGE_OPTIONS.map((stage) => (
+              <option key={stage} value={stage}>
+                {stage}
+              </option>
+            ))}
+          </select>
           <CopyButton
             text={job.recruiterMessage}
             label="Copy recruiter message"
@@ -158,6 +192,48 @@ export function SavedJobCard({ job, onDelete }: SavedJobCardProps) {
         {expanded ? (
           <div className="mt-6 border-t border-slate-200/80 pt-6">
             <div className="grid gap-5">
+              <div className="grid gap-5 lg:grid-cols-2">
+                <label className="grid gap-2 text-sm font-medium text-slate-700">
+                  Next step
+                  <input
+                    value={job.nextStep ?? ""}
+                    onChange={(event) => onUpdate(job.id, { nextStep: event.target.value })}
+                    className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-slate-900 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                    placeholder="Send recruiter note, tailor resume, follow up..."
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-medium text-slate-700">
+                  Follow-up date
+                  <input
+                    type="date"
+                    value={job.followUpDate ?? ""}
+                    onChange={(event) => onUpdate(job.id, { followUpDate: event.target.value })}
+                    className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-slate-900 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-5 lg:grid-cols-2">
+                <label className="grid gap-2 text-sm font-medium text-slate-700">
+                  Job URL
+                  <input
+                    value={job.sourceUrl ?? ""}
+                    onChange={(event) => onUpdate(job.id, { sourceUrl: event.target.value })}
+                    className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-slate-900 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                    placeholder="https://..."
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-medium text-slate-700">
+                  Notes
+                  <textarea
+                    value={job.notes ?? ""}
+                    onChange={(event) => onUpdate(job.id, { notes: event.target.value })}
+                    className="min-h-[96px] rounded-3xl border border-slate-200 bg-white px-4 py-4 text-slate-900 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                    placeholder="Recruiter name, referral target, application notes..."
+                  />
+                </label>
+              </div>
+
               <div className="metric-tile rounded-[1.8rem] p-5">
                 <p className="text-sm font-semibold text-slate-950">Explanation</p>
                 <p className="mt-3 text-sm leading-7 text-slate-600">{job.explanation}</p>
@@ -200,6 +276,27 @@ export function SavedJobCard({ job, onDelete }: SavedJobCardProps) {
                   </div>
                 </div>
               </div>
+
+              {job.evidenceSnippets.length ? (
+                <div className="metric-tile rounded-[1.8rem] p-5">
+                  <p className="text-sm font-semibold text-slate-950">Evidence snippets</p>
+                  <div className="mt-4 grid gap-3">
+                    {job.evidenceSnippets.slice(0, 5).map((evidence) => (
+                      <div
+                        key={`${job.id}-${evidence.category}-${evidence.phrase}-${evidence.snippet}`}
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                      >
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          {evidence.label}: {evidence.phrase}
+                        </p>
+                        <p className="mt-2 text-sm leading-7 text-slate-600">
+                          {evidence.snippet}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="metric-tile rounded-[1.8rem] p-5">
                 <p className="text-sm font-semibold text-slate-950">Original job description</p>

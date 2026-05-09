@@ -1,4 +1,4 @@
-import { RoleType, WorkAuthorizationStatus } from "@/types";
+import { ApplicationStage, RoleType, WorkAuthorizationStatus } from "@/types";
 
 export const WORK_AUTH_OPTIONS: WorkAuthorizationStatus[] = [
   "CPT",
@@ -19,6 +19,17 @@ export const ROLE_OPTIONS: RoleType[] = [
   "Marketing",
   "Software / Technical",
   "General"
+];
+
+export const APPLICATION_STAGE_OPTIONS: ApplicationStage[] = [
+  "Saved",
+  "Outreach needed",
+  "Messaged",
+  "Applied",
+  "Interviewing",
+  "Offer",
+  "Rejected",
+  "Archived"
 ];
 
 export const SAMPLE_JOB = {
@@ -278,7 +289,6 @@ export const HIGH_SENIORITY_PHRASES = [
   "senior",
   "lead",
   "principal",
-  "manager",
   "director",
   "head of",
   "5+ years",

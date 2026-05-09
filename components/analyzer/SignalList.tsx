@@ -70,6 +70,27 @@ export function SignalList({ result }: { result: AnalysisResult }) {
           />
         </div>
       )}
+
+      {result.evidenceSnippets.length ? (
+        <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50/90 p-5">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Evidence snippets
+          </p>
+          <div className="mt-4 grid gap-3">
+            {result.evidenceSnippets.slice(0, 5).map((evidence) => (
+              <div
+                key={`${evidence.category}-${evidence.phrase}-${evidence.snippet}`}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  {evidence.label}: {evidence.phrase}
+                </p>
+                <p className="mt-2 text-sm leading-7 text-slate-600">{evidence.snippet}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

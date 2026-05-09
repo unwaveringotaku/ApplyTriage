@@ -155,13 +155,13 @@ export function AnalyzerForm({
         </div>
 
         <label className="grid gap-2 text-sm font-medium text-slate-700">
-          Your background (optional)
+          Your background / resume text (optional)
           <textarea
             value={input.background ?? ""}
             onChange={(event) => onChange("background", event.target.value)}
             className="min-h-[140px] rounded-3xl border border-slate-200 bg-white px-4 py-4 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
-            placeholder="Example: MS Strategic Design and Management student, ex-Accenture, AI/ML operations, dashboards, product strategy, UX research..."
-            aria-label="Optional background"
+            placeholder="Paste a short background, resume summary, or key project bullets for tighter fit scoring..."
+            aria-label="Optional background or resume text"
           />
         </label>
 

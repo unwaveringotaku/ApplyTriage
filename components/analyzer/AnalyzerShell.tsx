@@ -28,6 +28,30 @@ function sleep(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+async function requestAnalysis(payload: JobInput) {
+  try {
+    const response = await fetch("/api/analyze", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (response.ok) {
+      const data = (await response.json()) as { result?: AnalysisResult };
+
+      if (data.result) {
+        return data.result;
+      }
+    }
+  } catch {
+    // Keep the showcase resilient if the API route is unavailable in a static preview.
+  }
+
+  return analyzeJobDescription(payload);
+}
+
 export function AnalyzerShell({ autoLoadSample = false }: { autoLoadSample?: boolean }) {
   const hasAutoLoadedSample = useRef(false);
   const requestSequenceRef = useRef(0);
@@ -62,7 +86,7 @@ export function AnalyzerShell({ autoLoadSample = false }: { autoLoadSample?: boo
       return;
     }
 
-    const nextResult = analyzeJobDescription(payload);
+    const nextResult = await requestAnalysis(payload);
     setResult(nextResult);
     setLoading(false);
   }
